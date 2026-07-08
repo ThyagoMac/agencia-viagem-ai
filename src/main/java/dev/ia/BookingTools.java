@@ -1,5 +1,6 @@
 package dev.ia;
 
+import java.util.List;
 import java.util.Optional;
 
 import dev.langchain4j.agent.tool.P;
@@ -20,15 +21,37 @@ public class BookingTools {
       .orElse("Reserva não encontrada");
   }
 
-  @Tool("Cancela uma reserva com base em seu número de identificação (bookingId) e no sobrenome do cliente (customerLastName).")
+  @Tool("Lista as reservas já feitas pelo usuário autenticado. Não use para o catálogo de pacotes disponíveis.")
+  public String getMyBookings() {
+    List<Booking> bookings = bookingService.getBookingsForCurrentUser();
+    if (bookings.isEmpty()) {
+      return "Nenhuma reserva encontrada para o usuário autenticado.";
+    }
+    return bookings.stream()
+      .map(BookingTools::formatBooking)
+      .reduce((a, b) -> a + "\n" + b)
+      .orElse("");
+  }
+
+  @Tool("Cancela uma reserva pelo bookingId. O usuário já está autenticado; basta o número da reserva.")
   public String cancelBooking(
-    @P("Número da reserva, apenas dígitos (ex: 12345)") String bookingId,
-    @P("Sobrenome do cliente (ex: Doe)") String customerLastName
+    @P("Número da reserva, apenas dígitos (ex: 12345)") String bookingId
   ) {
     return parseBookingId(bookingId)
-      .flatMap(id -> bookingService.cancelBooking(id, customerLastName))
+      .flatMap(id -> bookingService.cancelBooking(id))
       .map(booking -> "Reserva " + booking.id() + " cancelada com sucesso. Status atual: " + booking.status())
-      .orElse("Reserva não encontrada ou não pode ser cancelada. Verifique o bookingId e o sobrenome do cliente.");
+      .orElse("Reserva não encontrada ou não pertence ao usuário autenticado. Verifique o bookingId.");
+  }
+
+  private static String formatBooking(Booking booking) {
+    return "Reserva %d: %s (%s a %s) - %s [%s]".formatted(
+      booking.id(),
+      booking.destination(),
+      booking.startDate(),
+      booking.endDate(),
+      booking.status(),
+      booking.category()
+    );
   }
 
   private static Optional<Long> parseBookingId(String bookingId) {

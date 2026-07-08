@@ -1,11 +1,13 @@
 package dev.ia;
 
-import java.nio.file.Paths;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import dev.langchain4j.data.document.Document;
-import dev.langchain4j.data.document.DocumentSplitter;
-import dev.langchain4j.data.document.splitter.DocumentSplitters;
-import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.store.embedding.EmbeddingStore;
@@ -17,6 +19,8 @@ import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class DocumentIngestor {
+  private static final Pattern CATEGORY = Pattern.compile("Categoria:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
+
   @Inject
   EmbeddingStore<TextSegment> store;
 
@@ -24,20 +28,42 @@ public class DocumentIngestor {
   EmbeddingModel embeddingModel;
 
   public void onStart(@Observes StartupEvent event) {
-    Document document = FileSystemDocumentLoader.loadDocument(
-      Paths.get("src/main/resources/rag/pacotes-viagem.md")
-    );
-
-    document.metadata().put("type", "packages");
-
-    DocumentSplitter splitter = DocumentSplitters.recursive(200, 20);
+    String content = loadResource("/rag/pacotes-viagem.md");
+    String[] sections = content.split("(?=### )");
 
     EmbeddingStoreIngestor ingestor = EmbeddingStoreIngestor.builder()
-      .documentSplitter(splitter)
       .embeddingModel(embeddingModel)
       .embeddingStore(store)
       .build();
 
-    ingestor.ingest(document);
+    for (String section : sections) {
+      if (section.isBlank()) {
+        continue;
+      }
+
+      Document document = Document.from(section.trim());
+      document.metadata().put("type", "package");
+      extractCategory(section).ifPresent(category -> document.metadata().put("category", category));
+      ingestor.ingest(document);
+    }
+  }
+
+  private String loadResource(String path) {
+    try (InputStream input = getClass().getResourceAsStream(path)) {
+      if (input == null) {
+        throw new IllegalStateException("Arquivo RAG não encontrado: " + path);
+      }
+      return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new IllegalStateException("Falha ao carregar " + path, e);
+    }
+  }
+
+  private static Optional<String> extractCategory(String section) {
+    Matcher matcher = CATEGORY.matcher(section);
+    if (matcher.find()) {
+      return Optional.of(matcher.group(1).toUpperCase());
+    }
+    return Optional.empty();
   }
 }
