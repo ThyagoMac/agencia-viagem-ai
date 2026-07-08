@@ -4,7 +4,8 @@ import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
 import io.quarkiverse.langchain4j.RegisterAiService;
 
-@RegisterAiService(retrievalAugmentor = RagConfiguration.class)
+// inclui a classe tools
+@RegisterAiService(tools = BookingTools.class)
 public interface PackageExpert {
   @SystemMessage("""
       Você é um especialista em pacotes de viagem.
