@@ -17,7 +17,7 @@ public class BookingTools {
   public String getBookingDetails(@P("Número da reserva, apenas dígitos (ex: 12345)") String bookingId) {
     return parseBookingId(bookingId)
       .flatMap(bookingService::getBookingDetails)
-      .map(Booking::toString)
+      .map(BookingTools::formatBooking)
       .orElse("Reserva não encontrada");
   }
 
