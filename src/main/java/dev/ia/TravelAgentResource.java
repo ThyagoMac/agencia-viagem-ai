@@ -24,7 +24,7 @@ public class TravelAgentResource {
       try {
         SecurityContext.setCurrentUser(userName);
         return bookingCommandHandler.tryHandle(question)
-          .orElseGet(() -> bookingCommandHandler.resolveResponse(expert.chat(userName, question)));
+          .orElseGet(() -> bookingCommandHandler.resolveResponse(expert.chat(userName, question, userName)));
       } catch (Exception e) {
         return "Error: " + e.getMessage() + " Please provide a valid user name";
       } finally {
